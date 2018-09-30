@@ -1,2 +1,2 @@
-# itf21215_examples
-Example code for ITF21215 Computer Graphics and Virtual Environments at Østfold University College
+# ITF21215 Computer Graphics and Virtual Environments
+Example code for ITF21215 Computer Graphics and Virtual Environments, a bachelor level computer science course at Østfold University College
