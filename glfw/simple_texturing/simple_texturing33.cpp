@@ -17,7 +17,7 @@
 
 // Vertex Array attributes
 #define POSITION 0
-#define COLOR 1
+#define UV 1
 
 // GLSL Uniform locations
 #define PROJECTION_MATRIX 0
@@ -282,7 +282,6 @@ void resizeGL(int width, int height) {
   
     // Change the projection matrix
     glm::mat4 proj = glm::perspective(3.14f/2.0f, (float)width/height, 0.1f, 100.0f);
-    memcpy(projectionMatrixPtr, &proj[0][0], 16 * sizeof(GLfloat));
     glUseProgram(programName); 
     glUniformMatrix4fv(projectionMatrixPos, 1, GL_FALSE, &proj[0][0]);
     glUseProgram(0);
