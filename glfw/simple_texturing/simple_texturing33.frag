@@ -1,7 +1,7 @@
 #version 330
 
 // Incoming interpolated (between vertices) texture coordinate
-in vec3 interpolatedColor;
+in vec2 UV;
 
 // Outgoing final color.
 out vec4 outputColor;

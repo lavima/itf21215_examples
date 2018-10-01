@@ -137,8 +137,8 @@ int initGL() {
 
     // Specify attribute format
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferNames[POSITION]);
-    glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0); // 3.0
-    glVertexAttribPointer(UV, 2, GL_FLOAT, GL_FALSE, 0, 0); // 3.0
+    glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GL_FLOAT), 0); // 3.0
+    glVertexAttribPointer(UV, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GL_FLOAT), (void *)(3 * sizeof(GL_FLOAT))); // 3.0
 
     // Enable the attributes
     glEnableVertexAttribArray(POSITION); // 2.0
@@ -265,7 +265,7 @@ void drawGLScene() {
     glBindTexture(GL_TEXTURE_2D, textureName);
 
     // Draw the vertex array
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, indices);
 
     // Disable
     glUseProgram(0);
