@@ -90,6 +90,13 @@ GLuint vertexArrayName;
 GLuint vertexBufferNames[4];
 GLuint textureName;
 
+double timeDelta;
+double previousTime;
+
+glm::vec3 cameraPosition;
+glm::vec3 cameraForward;
+glm::vec3 cameraRight;
+
 /*
  * Read shader source file from disk
  */
@@ -279,13 +286,19 @@ void drawGLScene() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Change the view matrix
-    glm::mat4 view = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-    memcpy(viewMatrixPtr, &view[0][0], 16 * sizeof(GLfloat));
+    glm::mat4 viewRot = glm::mat4(1.0f);
+    viewRot = glm::rotate(viewRot, 0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    cameraForward = viewRot * glm::vec4(cameraForward, 1);
+    cameraRight = viewRot * glm::vec4(cameraRight, 1);
+    glm::mat4 viewTrans = glm::mat4(1.0f);
+    viewTrans = glm::translate(viewTrans, cameraPosition);
+    glm::mat4 view = viewTrans * viewRot;
+    glm::mat4 viewInverse = glm::inverse(view);
+    memcpy(viewMatrixPtr, &viewInverse[0][0], 16 * sizeof(GLfloat));
 
     // Change the model matrix
     glm::mat4 model = glm::mat4(1.0);
-    model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
+    model = glm::rotate(model, (float)previousTime * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
     memcpy(modelMatrixPtr, &model[0][0], 16 * sizeof(GLfloat));
 
     // Activate the program, vertex array and texture
@@ -333,8 +346,26 @@ static void glfwErrorCallback(int error, const char* description) {
  * Input event callback function for GLFW
  */
 static void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+
+    if (key == GLFW_KEY_W) {
+        cameraPosition = cameraPosition + cameraForward * (float)(timeDelta * 10.0f); 
+        printf("W\n");
+    }
+    else if(key == GLFW_KEY_A) {
+        cameraPosition = cameraPosition - cameraRight * (float)(timeDelta * 10.0f); 
+        printf("A\n");
+    }
+    else if(key == GLFW_KEY_S) {
+        cameraPosition = cameraPosition - cameraForward * (float)(timeDelta * 10.0f); 
+        printf("S\n");
+    }
+    else if(key == GLFW_KEY_D) {
+        cameraPosition = cameraPosition + cameraRight * (float)(timeDelta * 10.0f); 
+        printf("D\n");
+    }
 }
 
 /*
@@ -403,9 +434,19 @@ int main(void) {
     // Initialize OpenGL view
     resizeGL(DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
+    cameraPosition = glm::vec3(0.0f, 0.0f, 3.0f);
+    cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
+    cameraRight = glm::vec3(1.0f, 0.0f, 0.0f);
+
+    previousTime = glfwGetTime();
+
     // Run a loop until the window is closed
     while (!glfwWindowShouldClose(window)) {
 
+        double timeTotal = glfwGetTime();
+        timeDelta = timeTotal - previousTime;
+        previousTime = timeTotal;
+         
         // Draw OpenGL screne
         drawGLScene();
 
