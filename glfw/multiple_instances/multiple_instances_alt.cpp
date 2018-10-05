@@ -13,8 +13,7 @@
 #define VERTICES 0
 #define INDICES 1
 #define GLOBAL_MATRICES 2
-#define MODEL_MATRIX1 3
-#define MODEL_MATRIX2 4
+#define MODEL_MATRIX 3
 #define LIGHT_PROPERTIES 5
 #define MATERIAL_PROPERTIES 6
 #define CAMERA_PROPERTIES 7
@@ -110,8 +109,7 @@ GLfloat cameraProperties[] {
 // Pointers for updating GPU data
 GLfloat *projectionMatrixPtr;
 GLfloat *viewMatrixPtr;
-GLfloat *modelMatrix1Ptr;
-GLfloat *modelMatrix2Ptr;
+GLfloat *modelMatrixPtr;
 
 // Names
 GLuint programName;
@@ -179,8 +177,7 @@ int initGL() {
 
     // Allocate storage for the transformation matrices and retrieve their addresses
     glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-    glNamedBufferStorage(vertexBufferNames[MODEL_MATRIX1], 16 * sizeof(GLfloat), NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-    glNamedBufferStorage(vertexBufferNames[MODEL_MATRIX2], 16 * sizeof(GLfloat), NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    glNamedBufferStorage(vertexBufferNames[MODEL_MATRIX], 16 * sizeof(GLfloat), NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 
     // Allocate storage for the buffers used for lighting calculations
     glNamedBufferStorage(vertexBufferNames[LIGHT_PROPERTIES], 16 * sizeof(GLfloat), lightProperties, 0);
@@ -194,9 +191,7 @@ int initGL() {
     viewMatrixPtr = globalMatricesPtr + 16;
 
     // Get a pointer to the model matrix data
-    modelMatrix1Ptr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX1], 0, 16 * sizeof(GLfloat), 
-            GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-    modelMatrix2Ptr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX2], 0, 16 * sizeof(GLfloat), 
+    modelMatrixPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX], 0, 16 * sizeof(GLfloat), 
             GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
 
     // Create and initialize a vertex array object
@@ -299,18 +294,6 @@ void drawGLScene() {
     view = glm::translate(view, glm::vec3(-cameraProperties[0], -cameraProperties[1], -cameraProperties[2]));
     memcpy(viewMatrixPtr, &view[0][0], 16 * sizeof(GLfloat));
 
-    // Set the model matrix for the first cube
-    glm::mat4 model1 = glm::mat4(1.0);
-    model1 = glm::translate(model1, glm::vec3(-1.5f, 0.0f, 0.0f));
-    model1 = glm::rotate(model1, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
-    memcpy(modelMatrix1Ptr, &model1[0][0], 16 * sizeof(GLfloat));
-
-    // Set the model matrix for the second cube
-    glm::mat4 model2 = glm::mat4(1.0);
-    model2 = glm::translate(model2, glm::vec3(1.5f, 0.0f, 0.0f));
-    model2 = glm::rotate(model2, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
-    memcpy(modelMatrix2Ptr, &model2[0][0], 16 * sizeof(GLfloat));
-
     // Activate the program
     glUseProgram(programName);
 
@@ -319,17 +302,28 @@ void drawGLScene() {
 
     // Bind buffers to GLSL uniform indices
     glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM0, vertexBufferNames[GLOBAL_MATRICES]);
+    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX]);
     glBindBufferBase(GL_UNIFORM_BUFFER, LIGHT, vertexBufferNames[LIGHT_PROPERTIES]);
     glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL, vertexBufferNames[MATERIAL_PROPERTIES]);
     glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA, vertexBufferNames[CAMERA_PROPERTIES]);
 
-    // Activate first model matrix and draw cube
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX1]);
+    // Set the model matrix for the first cube and draw it
+    glm::mat4 model1 = glm::mat4(1.0);
+    model1 = glm::translate(model1, glm::vec3(-1.5f, 0.0f, 0.0f));
+    model1 = glm::rotate(model1, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
+    memcpy(modelMatrixPtr, &model1[0][0], 16 * sizeof(GLfloat));
     glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
 
-    // Activate first model matrix and draw cube
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX2]);
+    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 1000);
+
+    // Set the model matrix for the second cube and draw it
+    glm::mat4 model2 = glm::mat4(1.0);
+    model2 = glm::translate(model2, glm::vec3(1.5f, 0.0f, 0.0f));
+    model2 = glm::rotate(model2, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
+    memcpy(modelMatrixPtr, &model2[0][0], 16 * sizeof(GLfloat));
     glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
+
+    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 1000);
 
     // Disable
     glUseProgram(0);
