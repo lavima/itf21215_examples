@@ -147,14 +147,17 @@ int loadObj(const char *filename) {
 
         glGenTextures(1, &mesh->textureName);
         glBindTexture(GL_TEXTURE_2D, mesh->textureName);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         if (channels == 3)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
         else if (channels == 4)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
         else
             assert(0);  // TODO
+        glGenerateMipmap(GL_TEXTURE_2D);
 
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(imageData);
@@ -176,7 +179,7 @@ int loadObj(const char *filename) {
             vertices.push_back(attributes.normals[idx1.normal_index*3+1]);
             vertices.push_back(attributes.normals[idx1.normal_index*3+2]);
             vertices.push_back(attributes.texcoords[idx1.texcoord_index*2]);
-            vertices.push_back(attributes.texcoords[idx1.texcoord_index*2+1]);
+            vertices.push_back(1.0f - attributes.texcoords[idx1.texcoord_index*2+1]);
             vertices.push_back(attributes.vertices[idx2.vertex_index*3]);
             vertices.push_back(attributes.vertices[idx2.vertex_index*3+1]);
             vertices.push_back(attributes.vertices[idx2.vertex_index*3+2]);
@@ -184,7 +187,7 @@ int loadObj(const char *filename) {
             vertices.push_back(attributes.normals[idx2.normal_index*3+1]);
             vertices.push_back(attributes.normals[idx2.normal_index*3+2]);
             vertices.push_back(attributes.texcoords[idx2.texcoord_index*2]);
-            vertices.push_back(attributes.texcoords[idx2.texcoord_index*2+1]);
+            vertices.push_back(1.0f - attributes.texcoords[idx2.texcoord_index*2+1]);
             vertices.push_back(attributes.vertices[idx3.vertex_index*3]);
             vertices.push_back(attributes.vertices[idx3.vertex_index*3+1]);
             vertices.push_back(attributes.vertices[idx3.vertex_index*3+2]);
@@ -192,7 +195,7 @@ int loadObj(const char *filename) {
             vertices.push_back(attributes.normals[idx3.normal_index*3+1]);
             vertices.push_back(attributes.normals[idx3.normal_index*3+2]);
             vertices.push_back(attributes.texcoords[idx3.texcoord_index*2]);
-            vertices.push_back(attributes.texcoords[idx3.texcoord_index*2+1]);
+            vertices.push_back(1.0f - attributes.texcoords[idx3.texcoord_index*2+1]);
 
         }
 
@@ -266,31 +269,6 @@ int initGL() {
     // Get a pointer to the model matrix data
     modelMatrixPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX], 0, 16 * sizeof(GLfloat), 
             GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
-    // Load image from file
-    GLint width, height, numChannels;
-    GLubyte *imageData = stbi_load("texture.png", &width, &height, &numChannels, 3); 
-
-    // Generate texture name
-    glGenTextures(1, &textureName);
-
-    // Bind the texture
-    glBindTexture(GL_TEXTURE_2D, textureName);
-
-    // Specify the format of the texture
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
-
-    // Set the sampler parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    // Generate mip maps
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    // Deactivate texture
-    glBindTexture(GL_TEXTURE_2D, 0);
 
     // Load and compile vertex shader
     GLuint vertexName = glCreateShader(GL_VERTEX_SHADER);
@@ -370,6 +348,7 @@ void drawGLScene() {
 
     // Set the model matrix
     glm::mat4 model = glm::mat4(1.0);
+    model = glm::translate(model, glm::vec3(0.0f, -20.0f, 0.0f));
     model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
     memcpy(modelMatrixPtr, &model[0][0], 16 * sizeof(GLfloat));
 
