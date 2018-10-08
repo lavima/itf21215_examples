@@ -40,6 +40,9 @@
 #define MATERIAL 3
 #define CAMERA 4
 
+/*
+ * A structure for storing mesh data
+ */
 typedef struct {
     GLuint bufferName;
     GLuint arrayName;
@@ -47,6 +50,7 @@ typedef struct {
     GLsizei numVertices;
 } Mesh;
 
+// A vector of mesh instances
 std::vector<Mesh> meshes;
 
 // Light properties (4 valued vectors due to std140 see OpenGL 4.5 reference)
@@ -54,9 +58,9 @@ GLfloat lightProperties[] {
     // Position
     0.0f, 0.0f, 70.0f, 0.0f,
     // Ambient Color
-    0.0f, 0.0f, 0.2f, 0.0f,
+    0.4f, 0.4f, 0.4f, 0.0f,
     // Diffuse Color
-    0.5f, 0.5f, 0.5f, 0.0f,
+    0.7f, 0.5f, 0.5f, 0.0f,
     // Specular Color
     0.6f, 0.6f, 0.6f, 0.0f
 };
@@ -82,7 +86,6 @@ GLfloat *modelMatrixPtr;
 // Names
 GLuint programName;
 GLuint vertexBufferNames[5];
-GLuint textureName;
 
 /*
  * Read shader source file from disk

@@ -11,20 +11,12 @@
 
 // Vertex Buffer Identifiers
 #define VERTICES 0
-#define INDICES 1
-#define GLOBAL_MATRICES 2
-#define MODEL_MATRIX 3
-#define LIGHT_PROPERTIES 5
-#define MATERIAL_PROPERTIES 6
-#define CAMERA_PROPERTIES 7
 
 // Vertex Array attributes
 #define POSITION 0
 #define COLOR 1
 #define NORMAL 2
 
-// Vertex Array binding points
-#define STREAM0 0
 
 // GLSL Uniform indices
 #define TRANSFORM0 0
@@ -82,39 +74,31 @@ GLushort indices[] {
     20, 21, 22, 22, 23, 20
 };
 
-// Light properties (4 valued vectors due to std140 see OpenGL 4.5 reference)
-GLfloat lightProperties[] {
-    // Position
-    0.0f, 0.0f, 4.0f, 0.0f,
-    // Ambient Color
-    0.0f, 0.0f, 0.2f, 0.0f,
-    // Diffuse Color
-    0.5f, 0.5f, 0.5f, 0.0f,
-    // Specular Color
-    0.6f, 0.6f, 0.6f, 0.0f
-};
+// Uniforms values
+GLfloat lightPosition[] { 0.0f, 0.0f, 4.0f };
+GLfloat lightAmbient[] { 0.1f, 0.1f, 0.2f };
+GLfloat lightDiffuse[] { 0.5f, 0.5f, 0.5f };
+GLfloat lightSpecular[] { 0.6f, 0.6f, 0.6f };
+GLfloat materialShininessColor[] { 1.0f, 1.0f, 1.0f,  1.0f };
+GLfloat materialShininess = 32.0f;
+GLfloat cameraPosition[] { 0.0f, 0.0f, 4.0f };
 
-GLfloat materialProperties[] = {
-    // Shininess color
-    1.0f, 1.0f, 1.0f, 1.0f,
-    // Shininess
-    32.0f
-};
-
-// Camera properties 
-GLfloat cameraProperties[] {
-    0.0f, 0.0f, 4.0f
-};
-
-// Pointers for updating GPU data
-GLfloat *projectionMatrixPtr;
-GLfloat *viewMatrixPtr;
-GLfloat *modelMatrixPtr;
+// Uniform locations
+GLint projectionMatrixPos;
+GLint viewMatrixPos;
+GLint modelMatrixPos;
+GLint lightPositionPos;
+GLint lightAmbientPos;
+GLint lightDiffusePos;
+GLint lightSpecularPos;
+GLint materialShininessColorPos;
+GLint materialShininessPos;
+GLint cameraPositionPos;
 
 // Names
 GLuint programName;
 GLuint vertexArrayName;
-GLuint vertexBufferNames[8];
+GLuint vertexBufferNames[1];
 
 /*
  * Read shader source file from disk
@@ -150,88 +134,50 @@ char *readSourceFile(const char *filename, int *size) {
 }
 
 /*
- * Callback function for OpenGL debug messages 
- */
-void glDebugCallback(GLenum sources, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *msg, const void *userParam) {
-    printf("DEBUG: %s\n", msg);
-}
-
-/*
  * Initialize OpenGL
  */
 int initGL() {
 
-    // Register the debug callback function
-    glDebugMessageCallback(glDebugCallback, NULL);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-
-    // Create and initialize 4 buffer names
-    glCreateBuffers(8, vertexBufferNames);
+    // Create 2 buffer names
+    glGenBuffers(2, vertexBufferNames); // 2.0
 
     // Allocate storage for the vertex array buffers
-    glNamedBufferStorage(vertexBufferNames[VERTICES], 6 * 4 * 9 * sizeof(GLfloat), vertices, 0);
-
-    // Allocate storage for the triangle indices
-    glNamedBufferStorage(vertexBufferNames[INDICES], 3 * 2 * 6 * sizeof(GLshort), indices, 0);
-
-    // Allocate storage for the transformation matrices and retrieve their addresses
-    glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-    glNamedBufferStorage(vertexBufferNames[MODEL_MATRIX], 16 * sizeof(GLfloat), NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-
-    // Allocate storage for the buffers used for lighting calculations
-    glNamedBufferStorage(vertexBufferNames[LIGHT_PROPERTIES], 16 * sizeof(GLfloat), lightProperties, 0);
-    glNamedBufferStorage(vertexBufferNames[MATERIAL_PROPERTIES], 5 * sizeof(GLfloat), materialProperties, 0);
-    glNamedBufferStorage(vertexBufferNames[CAMERA_PROPERTIES], 3 * sizeof(GLfloat), cameraProperties, 0);
-
-    // Get a pointer to the global matrices data
-    GLfloat *globalMatricesPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[GLOBAL_MATRICES], 0, 16 * sizeof(GLfloat) * 2, 
-            GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-    projectionMatrixPtr = globalMatricesPtr;
-    viewMatrixPtr = globalMatricesPtr + 16;
-
-    // Get a pointer to the model matrix data
-    modelMatrixPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX], 0, 16 * sizeof(GLfloat), 
-            GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferNames[VERTICES]); // 2.0
+    glBufferData(GL_ARRAY_BUFFER, 6 * 4* 9 * sizeof(GLfloat), vertices, GL_STATIC_DRAW); // 2.0
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // Create and initialize a vertex array object
-    glCreateVertexArrays(1, &vertexArrayName);
-
-    // Associate attributes with binding points
-    glVertexArrayAttribBinding(vertexArrayName, POSITION, STREAM0);
-    glVertexArrayAttribBinding(vertexArrayName, COLOR, STREAM0);
-    glVertexArrayAttribBinding(vertexArrayName, NORMAL, STREAM0);
+    glGenVertexArrays(1, &vertexArrayName); // 3.0
+    glBindVertexArray(vertexArrayName); // 3.0
 
     // Specify attribute format
-    glVertexArrayAttribFormat(vertexArrayName, POSITION, 3, GL_FLOAT, GL_FALSE, 0);
-    glVertexArrayAttribFormat(vertexArrayName, COLOR, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT));
-    glVertexArrayAttribFormat(vertexArrayName, NORMAL, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT));
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferNames[VERTICES]);
+    glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(GL_FLOAT), 0); // 3.0
+    glVertexAttribPointer(COLOR, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(GL_FLOAT), (const void *)(3 * sizeof(GL_FLOAT)));
+    glVertexAttribPointer(NORMAL, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(GL_FLOAT), (const void *)(6 * sizeof(GL_FLOAT)));
 
     // Enable the attributes
-    glEnableVertexArrayAttrib(vertexArrayName, POSITION);
-    glEnableVertexArrayAttrib(vertexArrayName, COLOR);
-    glEnableVertexArrayAttrib(vertexArrayName, NORMAL);
+    glEnableVertexAttribArray(POSITION); // 2.0
+    glEnableVertexAttribArray(COLOR);
+    glEnableVertexAttribArray(NORMAL);
 
-    // Bind the indices to the vertex array
-    glVertexArrayElementBuffer(vertexArrayName, vertexBufferNames[INDICES]);
-
-    // Bind the vertex buffer to the vertex array
-    glVertexArrayVertexBuffer(vertexArrayName, STREAM0, vertexBufferNames[VERTICES], 0, 9 * sizeof(GLfloat));
+    // Disable the vertex array
+    glBindVertexArray(0);
 
     // Load and compile vertex shader
-    GLuint vertexName = glCreateShader(GL_VERTEX_SHADER);
+    GLuint vertexName = glCreateShader(GL_VERTEX_SHADER); // 2.0
     int vertexLength = 0;
-    char *vertexSource = readSourceFile("simple_lighting.vert", &vertexLength);
-    glShaderSource(vertexName, 1, (const char * const *)&vertexSource, &vertexLength);
+    char *vertexSource = readSourceFile("simple_lighting33.vert", &vertexLength);
+    glShaderSource(vertexName, 1, (const char * const *)&vertexSource, &vertexLength); // 2.0
     GLint compileStatus;
-    glCompileShader(vertexName);
-    glGetShaderiv(vertexName, GL_COMPILE_STATUS, &compileStatus);
+    glCompileShader(vertexName); // 2.0
+    glGetShaderiv(vertexName, GL_COMPILE_STATUS, &compileStatus); // 2.0
     if (!compileStatus) {
         GLint logSize = 0;
         glGetShaderiv(vertexName, GL_INFO_LOG_LENGTH, &logSize);
         char *errorLog = (char *)malloc(sizeof(char) * logSize);
-        glGetShaderInfoLog(vertexName, logSize, &logSize, errorLog);
-        glDeleteShader(vertexName);
+        glGetShaderInfoLog(vertexName, logSize, &logSize, errorLog); // 2.0
+        glDeleteShader(vertexName); // 2.0 
         printf("VERTEX ERROR %s\n", errorLog);
         return 0;
     }
@@ -240,7 +186,7 @@ int initGL() {
     // Load and compile fragment shader
     GLuint fragmentName = glCreateShader(GL_FRAGMENT_SHADER);
     int fragmentLength = 0;
-    char *fragmentSource = readSourceFile("simple_lighting.frag", &fragmentLength);
+    char *fragmentSource = readSourceFile("simple_lighting33.frag", &fragmentLength);
     glShaderSource(fragmentName, 1, (const char * const *)&fragmentSource, &fragmentLength);
     glCompileShader(fragmentName);
     glGetShaderiv(fragmentName, GL_COMPILE_STATUS, &compileStatus);
@@ -257,21 +203,33 @@ int initGL() {
     free(fragmentSource);
 
     // Create and link vertex program
-    programName = glCreateProgram();
-    glAttachShader(programName, vertexName);
+    programName = glCreateProgram(); // 2.0
+    glAttachShader(programName, vertexName); // 2.0
     glAttachShader(programName, fragmentName);
-    glLinkProgram(programName);
+    glLinkProgram(programName); // 2.0
     GLint linkStatus;
-    glGetProgramiv(programName, GL_LINK_STATUS, &linkStatus);
+    glGetProgramiv(programName, GL_LINK_STATUS, &linkStatus); // 2.0
     if (!linkStatus) {
         GLint logSize = 0;
         glGetProgramiv(programName, GL_INFO_LOG_LENGTH, &logSize);
         char *errorLog = (char *)malloc(sizeof(char) * logSize);
-        glGetProgramInfoLog(programName, logSize, &logSize, errorLog);
+        glGetProgramInfoLog(programName, logSize, &logSize, errorLog); // 2.0
 
         printf("LINK ERROR %s\n", errorLog);
         return 0;
     }
+
+    // Get uniform locations
+    projectionMatrixPos = glGetUniformLocation(programName, "proj");
+    viewMatrixPos = glGetUniformLocation(programName, "view");
+    modelMatrixPos = glGetUniformLocation(programName, "model");
+    lightPositionPos = glGetUniformLocation(programName, "lightPosition");
+    lightAmbientPos = glGetUniformLocation(programName, "lightAmbient");
+    lightDiffusePos = glGetUniformLocation(programName, "lightDiffuse");
+    lightSpecularPos = glGetUniformLocation(programName, "lightSpecular");
+    materialShininessColorPos = glGetUniformLocation(programName, "shininessColor");
+    materialShininessPos = glGetUniformLocation(programName, "shininess");
+    cameraPositionPos = glGetUniformLocation(programName, "cameraPosition");
 
     // Enable depth buffer testing
     glEnable(GL_DEPTH_TEST);
@@ -289,41 +247,43 @@ void drawGLScene() {
     // Clear color and depth buffers
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Activate the program
+    glUseProgram(programName); // 2.0
+
     // Set the view matrix
     glm::mat4 view = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(-cameraProperties[0], -cameraProperties[1], -cameraProperties[2]));
-    memcpy(viewMatrixPtr, &view[0][0], 16 * sizeof(GLfloat));
+    view = glm::translate(view, glm::vec3(-cameraPosition[0], -cameraPosition[1], -cameraPosition[2]));
+    glUniformMatrix4fv(viewMatrixPos, 1, GL_FALSE, &view[0][0]); // 2.0
 
-    // Activate the program
-    glUseProgram(programName);
+    // Set the remaining uniforms
+    glUniform3fv(lightPositionPos, 1, lightPosition);
+    glUniform3f(lightAmbientPos, lightAmbient[0], lightAmbient[1], lightAmbient[2]);
+    glUniform3fv(lightDiffusePos, 1, lightDiffuse);
+    glUniform3fv(lightSpecularPos, 1, lightSpecular);
+    glUniform4fv(materialShininessColorPos, 1, materialShininessColor);
+    glUniform1f(materialShininessPos, materialShininess);
+    glUniform3fv(cameraPositionPos, 1, cameraPosition);
 
     // Activate the vertex array
-    glBindVertexArray(vertexArrayName);
+    glBindVertexArray(vertexArrayName); // 3.0
 
-    // Bind buffers to GLSL uniform indices
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM0, vertexBufferNames[GLOBAL_MATRICES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, LIGHT, vertexBufferNames[LIGHT_PROPERTIES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL, vertexBufferNames[MATERIAL_PROPERTIES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA, vertexBufferNames[CAMERA_PROPERTIES]);
+    // Set the model matrix of the first cube
+    glm::mat4 model = glm::mat4(1.0);
+    model = glm::translate(model, glm::vec3(-1.5f, 0.0f, 0.0f));
+    model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
+    glUniformMatrix4fv(modelMatrixPos, 1, GL_FALSE, &model[0][0]);
 
-    // Set the model matrix for the first cube and draw it
-    glm::mat4 model1 = glm::mat4(1.0);
-    model1 = glm::translate(model1, glm::vec3(-1.5f, 0.0f, 0.0f));
-    model1 = glm::rotate(model1, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
-    memcpy(modelMatrixPtr, &model1[0][0], 16 * sizeof(GLfloat));
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
+    // Draw the vertex array
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, indices);
 
-    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 100000);
+    // Set the model matrix of the first cube
+    model = glm::mat4(1.0);
+    model = glm::translate(model, glm::vec3(1.5f, 0.0f, 0.0f));
+    model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
+    glUniformMatrix4fv(modelMatrixPos, 1, GL_FALSE, &model[0][0]);
 
-    // Set the model matrix for the second cube and draw it
-    glm::mat4 model2 = glm::mat4(1.0);
-    model2 = glm::translate(model2, glm::vec3(1.5f, 0.0f, 0.0f));
-    model2 = glm::rotate(model2, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
-    memcpy(modelMatrixPtr, &model2[0][0], 16 * sizeof(GLfloat));
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
-
-    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 100000);
+    // Draw the vertex array
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, indices);
 
     // Disable
     glUseProgram(0);
@@ -339,10 +299,12 @@ void resizeGL(int width, int height) {
 
     // Change the projection matrix
     glm::mat4 proj = glm::perspective(3.14f/2.0f, (float)width/height, 0.1f, 100.0f);
-    memcpy(projectionMatrixPtr, &proj[0][0], 16 * sizeof(GLfloat));
+    glUseProgram(programName); 
+    glUniformMatrix4fv(projectionMatrixPos, 1, GL_FALSE, &proj[0][0]);
+    glUseProgram(0);
 
     // Set the OpenGL viewport
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, width, height); // 2.0
 
 }
 
@@ -385,8 +347,10 @@ int main(void) {
     }
 
     // Specify minimum OpenGL version
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Create window
     GLFWwindow* window = glfwCreateWindow(DEFAULT_WIDTH, DEFAULT_HEIGHT, "Minimal", NULL, NULL);
