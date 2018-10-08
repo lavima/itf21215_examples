@@ -314,7 +314,8 @@ void drawGLScene() {
     memcpy(modelMatrixPtr, &model1[0][0], 16 * sizeof(GLfloat));
     glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
 
-    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 1000);
+    glFlush();
+    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 100000);
 
     // Set the model matrix for the second cube and draw it
     glm::mat4 model2 = glm::mat4(1.0);
@@ -323,7 +324,7 @@ void drawGLScene() {
     memcpy(modelMatrixPtr, &model2[0][0], 16 * sizeof(GLfloat));
     glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0);
 
-    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 1000);
+    glClientWaitSync(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), GL_SYNC_FLUSH_COMMANDS_BIT, 100000);
 
     // Disable
     glUseProgram(0);
