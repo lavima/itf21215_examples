@@ -52,7 +52,7 @@ std::vector<Mesh> meshes;
 // Light properties (4 valued vectors due to std140 see OpenGL 4.5 reference)
 GLfloat lightProperties[] {
     // Position
-    0.0f, 0.0f, 100.0f, 0.0f,
+    0.0f, 0.0f, 70.0f, 0.0f,
     // Ambient Color
     0.0f, 0.0f, 0.2f, 0.0f,
     // Diffuse Color
@@ -71,7 +71,7 @@ GLfloat materialProperties[] = {
 // Camera properties 
 GLfloat cameraProperties[] {
     // Position 
-    0.0f, 0.0f, 100.0f
+    0.0f, 0.0f, 80.0f
 };
 
 // Pointers for updating GPU data
@@ -118,35 +118,48 @@ char *readSourceFile(const char *filename, int *size) {
 }
 
 /*
- * Load model from specified obj-file. The data is stored in the global variables
+ * Load a model from the specified obj-file. This is a highly specialized implementation, meaning
+ * that certain shortcuts have been taken. The data is stored in the global variables. 
+ * WARNING This function will cause memory leaks on the GPU if called multiple times.
  */
 int loadObj(const char *filename) {
 
-    // Variables for storing the data in the OBJ-file
+    // Variables for storing the data in the OBJ-data
     tinyobj::attrib_t attributes;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
+
+    // String used to return an error message from tiny_obj_loader
     std::string errorString;
 
-    // Load the file 
+    // Load the file, or return FALSE if an error occured
     if (!tinyobj::LoadObj(&attributes, &shapes, &materials, &errorString, filename, "."))
         return 0;
 
+    // Loop through all the shapes in the OBJ-data
     for(int m=0; m<shapes.size(); ++m) {
 
+        // Create a new Mesh instance and store a local ponter for easy access
         meshes.push_back(Mesh());
         Mesh *mesh = &meshes[meshes.size()-1];
 
+        // Store a pointer to the mesh of the current shape
         tinyobj::mesh_t *objMesh = &shapes[m].mesh;
 
+        // Get the texture of the first face in the mesh. This is used for the entire mesh.
         std::string texture_filename = materials[objMesh->material_ids[0]].diffuse_texname;
+
+        // Read the texture image
         int width, height, channels;
         GLubyte *imageData = stbi_load(texture_filename.c_str(), &width, &height, &channels, STBI_default);
         if (!imageData)
             return 0;
 
+        // Generate a new texture name and activate it
         glGenTextures(1, &mesh->textureName);
         glBindTexture(GL_TEXTURE_2D, mesh->textureName);
+
+        // Set sampler properties
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -156,22 +169,31 @@ int loadObj(const char *filename) {
         else if (channels == 4)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
         else
-            assert(0);  // TODO
+            return 0; 
+
+        // Generate mip map images
         glGenerateMipmap(GL_TEXTURE_2D);
 
+        // Deactivate the texture and free the image data
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(imageData);
 
+        // Store the number of uique vertices and faces in the mesh
         int numVertices = mesh->numVertices = objMesh->indices.size();
         int numFaces = numVertices / 3;
 
+        // Create a vector for storing the vector data
         std::vector<GLfloat> vertices; 
+
+        // Loop through all the faces in the mesh
         for (int f=0; f<numFaces; ++f) {
 
+            // Store the indices of the current triangle
             tinyobj::index_t idx1 = objMesh->indices[f * 3];
             tinyobj::index_t idx2 = objMesh->indices[f * 3 + 1];
             tinyobj::index_t idx3 = objMesh->indices[f * 3 + 2];
 
+            // Store the first vertex (POSITION NORMAL UV)
             vertices.push_back(attributes.vertices[idx1.vertex_index*3]);
             vertices.push_back(attributes.vertices[idx1.vertex_index*3+1]);
             vertices.push_back(attributes.vertices[idx1.vertex_index*3+2]);
@@ -180,6 +202,7 @@ int loadObj(const char *filename) {
             vertices.push_back(attributes.normals[idx1.normal_index*3+2]);
             vertices.push_back(attributes.texcoords[idx1.texcoord_index*2]);
             vertices.push_back(1.0f - attributes.texcoords[idx1.texcoord_index*2+1]);
+            // Store the second vertex
             vertices.push_back(attributes.vertices[idx2.vertex_index*3]);
             vertices.push_back(attributes.vertices[idx2.vertex_index*3+1]);
             vertices.push_back(attributes.vertices[idx2.vertex_index*3+2]);
@@ -188,6 +211,7 @@ int loadObj(const char *filename) {
             vertices.push_back(attributes.normals[idx2.normal_index*3+2]);
             vertices.push_back(attributes.texcoords[idx2.texcoord_index*2]);
             vertices.push_back(1.0f - attributes.texcoords[idx2.texcoord_index*2+1]);
+            // Store the third vertex
             vertices.push_back(attributes.vertices[idx3.vertex_index*3]);
             vertices.push_back(attributes.vertices[idx3.vertex_index*3+1]);
             vertices.push_back(attributes.vertices[idx3.vertex_index*3+2]);
@@ -199,31 +223,29 @@ int loadObj(const char *filename) {
 
         }
 
+        // Create a vertex buffer with the vertex data
         glCreateBuffers(1, &mesh->bufferName);
-
-        // Allocate storage for the vertex array buffers
         glNamedBufferStorage(mesh->bufferName, vertices.size() * sizeof(GLfloat), &vertices[0], 0);
 
         // Create and initialize a vertex array object
         glCreateVertexArrays(1, &mesh->arrayName);
 
-        // Associate attributes with binding points
+        // Associate vertex attributes with the binding point (POSITION NORMAL UV)
         glVertexArrayAttribBinding(mesh->arrayName, POSITION, STREAM0);
         glVertexArrayAttribBinding(mesh->arrayName, NORMAL, STREAM0);
         glVertexArrayAttribBinding(mesh->arrayName, UV, STREAM0);
-
-        // Specify attribute format
-        glVertexArrayAttribFormat(mesh->arrayName, POSITION, 3, GL_FLOAT, GL_FALSE, 0);
-        glVertexArrayAttribFormat(mesh->arrayName, NORMAL, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT));
-        glVertexArrayAttribFormat(mesh->arrayName, UV, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT));
-
-        // Bind the vertex buffer to the vertex array
-        glVertexArrayVertexBuffer(mesh->arrayName, STREAM0, mesh->bufferName, 0, 8 * sizeof(GLfloat));
-
         // Enable the attributes
         glEnableVertexArrayAttrib(mesh->arrayName, POSITION);
         glEnableVertexArrayAttrib(mesh->arrayName, NORMAL);
         glEnableVertexArrayAttrib(mesh->arrayName, UV);
+
+        // Specify the format of the attributes
+        glVertexArrayAttribFormat(mesh->arrayName, POSITION, 3, GL_FLOAT, GL_FALSE, 0);
+        glVertexArrayAttribFormat(mesh->arrayName, NORMAL, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT));
+        glVertexArrayAttribFormat(mesh->arrayName, UV, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT));
+
+        // Bind the vertex data buffer to the vertex array
+        glVertexArrayVertexBuffer(mesh->arrayName, STREAM0, mesh->bufferName, 0, 8 * sizeof(GLfloat));
 
     }
 
@@ -361,13 +383,21 @@ void drawGLScene() {
     glBindBufferBase(GL_UNIFORM_BUFFER, LIGHT, vertexBufferNames[LIGHT_PROPERTIES]);
     glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL, vertexBufferNames[MATERIAL_PROPERTIES]);
     glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA, vertexBufferNames[CAMERA_PROPERTIES]);
-
+    
+    // Loop through all the meshes loaded from the OBJ-file
     for (int m=0; m<meshes.size(); ++m) {
+        
+        // Bind the vertex array and texture of the mesh
         glBindVertexArray(meshes[m].arrayName);
         glBindTexture(GL_TEXTURE_2D, meshes[m].textureName);
+
         // Draw the vertex array
         glDrawArrays(GL_TRIANGLES, 0, meshes[m].numVertices);
+
+        // Disable vertex array and texture
         glBindVertexArray(0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
     }
 
     // Disable
@@ -418,7 +448,13 @@ void glfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
 /*
  * Program entry function
  */
-int main(void) {
+int main(int nargs, const char **argv) {
+    
+    // Ensure that there is one argument (besides the program name)
+    if (nargs != 2) {
+        printf("Wrong usage\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Set error callback
     glfwSetErrorCallback(glfwErrorCallback);
@@ -469,8 +505,9 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    if (!loadObj("WoodenCabinObj.obj")) {
-        printf("Failed to load OBJ-file.\n");  
+    // Load the OBJ-file
+    if (!loadObj(argv[1])) {
+        printf("Failed to load %s.\n", argv[1]);  
         glfwDestroyWindow(window);
         glfwTerminate();
         exit(EXIT_FAILURE);
