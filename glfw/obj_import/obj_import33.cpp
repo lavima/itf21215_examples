@@ -17,21 +17,10 @@
 #define DEFAULT_WIDTH 1024
 #define DEFAULT_HEIGHT 768
 
-// Vertex Buffer Identifiers
-#define GLOBAL_MATRICES 0
-#define MODEL_MATRIX 1
-#define LIGHT_PROPERTIES 2
-#define MATERIAL_PROPERTIES 3
-#define CAMERA_PROPERTIES 4
-#define VERTICES 5
-
 // Vertex Array attributes
 #define POSITION 0
 #define NORMAL 1
 #define UV 2
-
-// Vertex Array binding points
-#define STREAM0 0
 
 // GLSL Uniform indices
 #define TRANSFORM0 0
@@ -53,39 +42,29 @@ typedef struct {
 // A vector of mesh instances
 std::vector<Mesh> meshes;
 
-// Light properties (4 valued vectors due to std140 see OpenGL 4.5 reference)
-GLfloat lightProperties[] {
-    // Position
-    0.0f, 0.0f, 70.0f, 0.0f,
-    // Ambient Color
-    0.4f, 0.4f, 0.4f, 0.0f,
-    // Diffuse Color
-    0.7f, 0.5f, 0.5f, 0.0f,
-    // Specular Color
-    0.6f, 0.6f, 0.6f, 0.0f
-};
+// Uniforms values
+GLfloat lightPosition[] { 0.0f, 0.0f, 80.0f };
+GLfloat lightAmbient[] { 0.4f, 0.4f, 0.4f };
+GLfloat lightDiffuse[] { 0.7f, 0.5f, 0.5f };
+GLfloat lightSpecular[] { 0.6f, 0.6f, 0.6f };
+GLfloat materialShininessColor[] { 1.0f, 1.0f, 1.0f,  1.0f };
+GLfloat materialShininess = 32.0f;
+GLfloat cameraPosition[] { 0.0f, 0.0f, 80.0f };
 
-GLfloat materialProperties[] = {
-    // Shininess color
-    1.0f, 1.0f, 1.0f, 1.0f,
-    // Shininess
-    32.0f
-};
-
-// Camera properties 
-GLfloat cameraProperties[] {
-    // Position 
-    0.0f, 0.0f, 80.0f
-};
-
-// Pointers for updating GPU data
-GLfloat *projectionMatrixPtr;
-GLfloat *viewMatrixPtr;
-GLfloat *modelMatrixPtr;
+// Uniform locations
+GLint projectionMatrixPos;
+GLint viewMatrixPos;
+GLint modelMatrixPos;
+GLint lightPositionPos;
+GLint lightAmbientPos;
+GLint lightDiffusePos;
+GLint lightSpecularPos;
+GLint materialShininessColorPos;
+GLint materialShininessPos;
+GLint cameraPositionPos;
 
 // Names
 GLuint programName;
-GLuint vertexBufferNames[5];
 
 /*
  * Read shader source file from disk
@@ -226,29 +205,31 @@ int loadObj(const char *filename) {
 
         }
 
-        // Create a vertex buffer with the vertex data
-        glCreateBuffers(1, &mesh->bufferName);
-        glNamedBufferStorage(mesh->bufferName, vertices.size() * sizeof(GLfloat), &vertices[0], 0);
+        // Create buffer name for the vertex data
+        glGenBuffers(1, &mesh->bufferName); // 2.0
+
+        // Allocate storage for the vertex array buffers
+        glBindBuffer(GL_ARRAY_BUFFER, mesh->bufferName); // 2.0
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), &vertices[0], GL_STATIC_DRAW); // 2.0
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         // Create and initialize a vertex array object
-        glCreateVertexArrays(1, &mesh->arrayName);
-
-        // Associate vertex attributes with the binding point (POSITION NORMAL UV)
-        glVertexArrayAttribBinding(mesh->arrayName, POSITION, STREAM0);
-        glVertexArrayAttribBinding(mesh->arrayName, NORMAL, STREAM0);
-        glVertexArrayAttribBinding(mesh->arrayName, UV, STREAM0);
-        // Enable the attributes
-        glEnableVertexArrayAttrib(mesh->arrayName, POSITION);
-        glEnableVertexArrayAttrib(mesh->arrayName, NORMAL);
-        glEnableVertexArrayAttrib(mesh->arrayName, UV);
+        glGenVertexArrays(1, &mesh->arrayName);
+        glBindVertexArray(mesh->arrayName);
 
         // Specify the format of the attributes
-        glVertexArrayAttribFormat(mesh->arrayName, POSITION, 3, GL_FLOAT, GL_FALSE, 0);
-        glVertexArrayAttribFormat(mesh->arrayName, NORMAL, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GL_FLOAT));
-        glVertexArrayAttribFormat(mesh->arrayName, UV, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT));
+        glBindBuffer(GL_ARRAY_BUFFER, mesh->bufferName);
+        glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GL_FLOAT), 0); // 3.0
+        glVertexAttribPointer(NORMAL, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GL_FLOAT), (void *)(3 * sizeof(GL_FLOAT))); // 3.0
+        glVertexAttribPointer(UV, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GL_FLOAT), (void *)(6 * sizeof(GL_FLOAT))); // 3.0
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        // Bind the vertex data buffer to the vertex array
-        glVertexArrayVertexBuffer(mesh->arrayName, STREAM0, mesh->bufferName, 0, 8 * sizeof(GLfloat));
+        // Enable the attributes
+        glEnableVertexAttribArray(POSITION); // 2.0
+        glEnableVertexAttribArray(NORMAL);
+        glEnableVertexAttribArray(UV);
+
+        glBindVertexArray(0);
 
     }
 
@@ -257,58 +238,24 @@ int loadObj(const char *filename) {
 }
 
 /*
- * Callback function for OpenGL debug messages 
- */
-void glDebugCallback(GLenum sources, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *msg, const void *userParam) {
-    printf("DEBUG: %s\n", msg);
-}
-
-/*
  * Initialize OpenGL
  */
 int initGL() {
 
-    // Register the debug callback function
-    glDebugMessageCallback(glDebugCallback, NULL);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-
-    // Create and initialize buffer names
-    glCreateBuffers(5, vertexBufferNames);
-
-    // Allocate storage for the transformation matrices and retrieve their addresses
-    glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-    glNamedBufferStorage(vertexBufferNames[MODEL_MATRIX], 16 * sizeof(GLfloat), NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-
-    // Allocate storage for the buffers used for lighting calculations
-    glNamedBufferStorage(vertexBufferNames[LIGHT_PROPERTIES], 16 * sizeof(GLfloat), lightProperties, 0);
-    glNamedBufferStorage(vertexBufferNames[MATERIAL_PROPERTIES], 5 * sizeof(GLfloat), materialProperties, 0);
-    glNamedBufferStorage(vertexBufferNames[CAMERA_PROPERTIES], 3 * sizeof(GLfloat), cameraProperties, 0);
-
-    // Get a pointer to the global matrices data
-    GLfloat *globalMatricesPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[GLOBAL_MATRICES], 0, 16 * sizeof(GLfloat) * 2, 
-            GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-    projectionMatrixPtr = globalMatricesPtr;
-    viewMatrixPtr = globalMatricesPtr + 16;
-
-    // Get a pointer to the model matrix data
-    modelMatrixPtr = (GLfloat *)glMapNamedBufferRange(vertexBufferNames[MODEL_MATRIX], 0, 16 * sizeof(GLfloat), 
-            GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
     // Load and compile vertex shader
-    GLuint vertexName = glCreateShader(GL_VERTEX_SHADER);
+    GLuint vertexName = glCreateShader(GL_VERTEX_SHADER); // 2.0
     int vertexLength = 0;
-    char *vertexSource = readSourceFile("default.vert", &vertexLength);
-    glShaderSource(vertexName, 1, (const char * const *)&vertexSource, &vertexLength);
+    char *vertexSource = readSourceFile("default33.vert", &vertexLength);
+    glShaderSource(vertexName, 1, (const char * const *)&vertexSource, &vertexLength); // 2.0
     GLint compileStatus;
-    glCompileShader(vertexName);
-    glGetShaderiv(vertexName, GL_COMPILE_STATUS, &compileStatus);
+    glCompileShader(vertexName); // 2.0
+    glGetShaderiv(vertexName, GL_COMPILE_STATUS, &compileStatus); // 2.0
     if (!compileStatus) {
         GLint logSize = 0;
         glGetShaderiv(vertexName, GL_INFO_LOG_LENGTH, &logSize);
         char *errorLog = (char *)malloc(sizeof(char) * logSize);
-        glGetShaderInfoLog(vertexName, logSize, &logSize, errorLog);
-        glDeleteShader(vertexName);
+        glGetShaderInfoLog(vertexName, logSize, &logSize, errorLog); // 2.0
+        glDeleteShader(vertexName); // 2.0 
         printf("VERTEX ERROR %s\n", errorLog);
         return 0;
     }
@@ -317,7 +264,7 @@ int initGL() {
     // Load and compile fragment shader
     GLuint fragmentName = glCreateShader(GL_FRAGMENT_SHADER);
     int fragmentLength = 0;
-    char *fragmentSource = readSourceFile("default.frag", &fragmentLength);
+    char *fragmentSource = readSourceFile("default33.frag", &fragmentLength);
     glShaderSource(fragmentName, 1, (const char * const *)&fragmentSource, &fragmentLength);
     glCompileShader(fragmentName);
     glGetShaderiv(fragmentName, GL_COMPILE_STATUS, &compileStatus);
@@ -334,21 +281,33 @@ int initGL() {
     free(fragmentSource);
 
     // Create and link vertex program
-    programName = glCreateProgram();
-    glAttachShader(programName, vertexName);
+    programName = glCreateProgram(); // 2.0
+    glAttachShader(programName, vertexName); // 2.0
     glAttachShader(programName, fragmentName);
-    glLinkProgram(programName);
+    glLinkProgram(programName); // 2.0
     GLint linkStatus;
-    glGetProgramiv(programName, GL_LINK_STATUS, &linkStatus);
+    glGetProgramiv(programName, GL_LINK_STATUS, &linkStatus); // 2.0
     if (!linkStatus) {
         GLint logSize = 0;
         glGetProgramiv(programName, GL_INFO_LOG_LENGTH, &logSize);
         char *errorLog = (char *)malloc(sizeof(char) * logSize);
-        glGetProgramInfoLog(programName, logSize, &logSize, errorLog);
+        glGetProgramInfoLog(programName, logSize, &logSize, errorLog); // 2.0
 
         printf("LINK ERROR %s\n", errorLog);
         return 0;
     }
+
+    // Get uniform locations
+    projectionMatrixPos = glGetUniformLocation(programName, "proj");
+    viewMatrixPos = glGetUniformLocation(programName, "view");
+    modelMatrixPos = glGetUniformLocation(programName, "model");
+    lightPositionPos = glGetUniformLocation(programName, "lightPosition");
+    lightAmbientPos = glGetUniformLocation(programName, "lightAmbient");
+    lightDiffusePos = glGetUniformLocation(programName, "lightDiffuse");
+    lightSpecularPos = glGetUniformLocation(programName, "lightSpecular");
+    materialShininessColorPos = glGetUniformLocation(programName, "shininessColor");
+    materialShininessPos = glGetUniformLocation(programName, "shininess");
+    cameraPositionPos = glGetUniformLocation(programName, "cameraPosition");
 
     // Enable depth buffer testing
     glEnable(GL_DEPTH_TEST);
@@ -366,30 +325,32 @@ void drawGLScene() {
     // Clear color and depth buffers
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Activate the program
+    glUseProgram(programName); // 2.0
+
     // Set the view matrix
     glm::mat4 view = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(-cameraProperties[0], -cameraProperties[1], -cameraProperties[2]));
-    memcpy(viewMatrixPtr, &view[0][0], 16 * sizeof(GLfloat));
+    view = glm::translate(view, glm::vec3(-cameraPosition[0], -cameraPosition[1], -cameraPosition[2]));
+    glUniformMatrix4fv(viewMatrixPos, 1, GL_FALSE, &view[0][0]); // 2.0
 
     // Set the model matrix
     glm::mat4 model = glm::mat4(1.0);
     model = glm::translate(model, glm::vec3(0.0f, -20.0f, 0.0f));
     model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
-    memcpy(modelMatrixPtr, &model[0][0], 16 * sizeof(GLfloat));
+    glUniformMatrix4fv(modelMatrixPos, 1, GL_FALSE, &model[0][0]);
 
-    // Activate the program
-    glUseProgram(programName);
+    // Set the remaining uniforms
+    glUniform3fv(lightPositionPos, 1, lightPosition);
+    glUniform3f(lightAmbientPos, lightAmbient[0], lightAmbient[1], lightAmbient[2]);
+    glUniform3fv(lightDiffusePos, 1, lightDiffuse);
+    glUniform3fv(lightSpecularPos, 1, lightSpecular);
+    glUniform4fv(materialShininessColorPos, 1, materialShininessColor);
+    glUniform1f(materialShininessPos, materialShininess);
+    glUniform3fv(cameraPositionPos, 1, cameraPosition);
 
-    // Bind buffers to GLSL uniform indices
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM0, vertexBufferNames[GLOBAL_MATRICES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, LIGHT, vertexBufferNames[LIGHT_PROPERTIES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL, vertexBufferNames[MATERIAL_PROPERTIES]);
-    glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA, vertexBufferNames[CAMERA_PROPERTIES]);
-    
     // Loop through all the meshes loaded from the OBJ-file
     for (int m=0; m<meshes.size(); ++m) {
-        
+
         // Bind the vertex array and texture of the mesh
         glBindVertexArray(meshes[m].arrayName);
         glBindTexture(GL_TEXTURE_2D, meshes[m].textureName);
@@ -398,8 +359,8 @@ void drawGLScene() {
         glDrawArrays(GL_TRIANGLES, 0, meshes[m].numVertices);
 
         // Disable vertex array and texture
-        glBindVertexArray(0);
         glBindTexture(GL_TEXTURE_2D, 0);
+        glBindVertexArray(0);
 
     }
 
@@ -416,10 +377,12 @@ void resizeGL(int width, int height) {
 
     // Change the projection matrix
     glm::mat4 proj = glm::perspective(3.14f/2.0f, (float)width/height, 0.1f, 1000.0f);
-    memcpy(projectionMatrixPtr, &proj[0][0], 16 * sizeof(GLfloat));
+    glUseProgram(programName); 
+    glUniformMatrix4fv(projectionMatrixPos, 1, GL_FALSE, &proj[0][0]);
+    glUseProgram(0);
 
     // Set the OpenGL viewport
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, width, height); // 2.0
 
 }
 
@@ -451,7 +414,7 @@ void glfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
  * Program entry function
  */
 int main(int nargs, const char **argv) {
-    
+
     // Ensure that there is one argument (besides the program name)
     if (nargs != 2) {
         printf("Wrong usage\n");
@@ -468,8 +431,10 @@ int main(int nargs, const char **argv) {
     }
 
     // Specify minimum OpenGL version
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Create window
     GLFWwindow* window = glfwCreateWindow(DEFAULT_WIDTH, DEFAULT_HEIGHT, "Minimal", NULL, NULL);

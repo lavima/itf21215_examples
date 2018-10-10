@@ -1,34 +1,23 @@
-#version 450
+#version 330
 
 // Incoming vertex position, Model Space.
 layout (location = 0) in vec3 position;
 
 // Incoming vertex color.
-layout (location = 1) in vec3 color;
+layout (location = 1) in vec3 normal;
 
 // Incoming normal
-layout (location = 2) in vec3 normal;
+layout (location = 2) in vec2 uv;
 
-// Projection and view matrices.
-layout (binding = 0, std140) uniform Transform0
-{
-    mat4 proj;
-    mat4 view;
-};
+// Projection, view and model matrices.
+uniform mat4 proj;
+uniform mat4 view;
+uniform mat4 model;
 
-// model matrix
-layout (binding = 1, std140) uniform Transform1
-{
-    mat4 model;
-};
-
-// Output
-layout (location = 0) out Block
-{
-    vec3 interpolatedColor;
-    vec3 N;
-    vec3 worldVertex;
-};
+// Output variables
+out vec2 UV;
+out vec3 N;
+out vec3 worldVertex;
 
 void main() {
 
@@ -41,7 +30,7 @@ void main() {
     // Set the transformed normal
     N = mat3(model) * normal;
 
-    // We assign the color to the outgoing variable.
-    interpolatedColor = color;
+    // We assign the uv to the outgoing variable.
+    UV = uv;
 
 }

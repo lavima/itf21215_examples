@@ -1,34 +1,20 @@
-#version 450
+#version 330
 
-// Incoming interpolated (between vertices) color.
-layout (location = 0) in Block
-{
-    vec3 interpolatedColor;
-    vec3 N;
-    vec3 worldVertex;
-};
+// Incoming variables.
+in vec2 UV;
+in vec3 N;
+in vec3 worldVertex;
 
-layout (std140, binding = 2) uniform Light
-{
-    vec3 lightPos;
-    vec3 lightAmbient;
-    vec3 lightDiffuse;
-    vec3 lightSpecular;
-};
-
-layout (std140, binding = 3) uniform Material
-{
-    vec4 shininessColor;
-    float shininess;
-};
-
-layout (std140, binding = 4) uniform Camera
-{
-    vec3 cameraPos;
-};
+uniform vec3 lightPosition;
+uniform vec3 lightAmbient;
+uniform vec3 lightDiffuse;
+uniform vec3 lightSpecular;
+uniform vec4 shininessColor;
+uniform float shininess;
+uniform vec3 cameraPosition;
 
 // Outgoing final color.
-layout (location = 0) out vec4 outputColor;
+out vec4 outputColor;
 
 // Vectors
 vec3 L;
@@ -42,19 +28,21 @@ vec4 ambient;
 vec4 diffuse;
 vec4 specular;
 
+// Texture sampler
+uniform sampler2D textureSampler;
 
 void main()
 {
-    color = vec4(interpolatedColor, 1);
+    color = texture(textureSampler, UV).rgba;
 
     // Normalize the interpolated normal to ensure unit length
     NN = normalize(N);
     
     // Find the unit length normal giving the direction from the vertex to the light
-    L = normalize(lightPos - worldVertex);
+    L = normalize(lightPosition - worldVertex);
 
     // Find the unit length normal giving the direction from the vertex to the camera
-    V = normalize(cameraPos - worldVertex);
+    V = normalize(cameraPosition - worldVertex);
 
     // Find the unit length reflection normal
     R = normalize(reflect(-L, NN));
