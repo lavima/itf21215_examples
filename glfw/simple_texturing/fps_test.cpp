@@ -29,6 +29,19 @@
 #define TRANSFORM0 0
 #define TRANSFORM1 1
 
+#define CAMERA_SPEED 5.0f
+#define CAMERA_SENSITITVITY 0.02
+
+// Keyboard state names
+#define CONTROL_FORWARD 0
+#define CONTROL_BACK 1
+#define CONTROL_LEFT 2
+#define CONTROL_RIGHT 3
+#define NUM_KEYS 4
+
+// Keyboard state
+int keys[NUM_KEYS];
+
 // Vertices
 GLfloat vertices[] = {
     // Front
@@ -78,6 +91,8 @@ GLshort indices[] {
     // Bottom
     20, 21, 22, 22, 23, 20
 };
+
+GLfloat pitch, yaw;
     
 // Pointers for updating GPU data
 GLfloat *projectionMatrixPtr;
@@ -96,6 +111,8 @@ double previousTime;
 glm::vec3 cameraPosition;
 glm::vec3 cameraForward;
 glm::vec3 cameraRight;
+
+int centerX, centerY;
 
 /*
  * Read shader source file from disk
@@ -285,9 +302,18 @@ void drawGLScene() {
     // Clear color and depth buffers
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    if (keys[CONTROL_FORWARD])
+        cameraPosition = cameraPosition + cameraForward * (float)(timeDelta * CAMERA_SPEED); 
+    else if (keys[CONTROL_LEFT]) 
+        cameraPosition = cameraPosition - cameraRight * (float)(timeDelta * CAMERA_SPEED); 
+    else if (keys[CONTROL_BACK])
+        cameraPosition = cameraPosition - cameraForward * (float)(timeDelta * CAMERA_SPEED); 
+    else if (keys[CONTROL_RIGHT])
+        cameraPosition = cameraPosition + cameraRight * (float)(timeDelta * CAMERA_SPEED); 
     // Change the view matrix
     glm::mat4 viewRot = glm::mat4(1.0f);
-    viewRot = glm::rotate(viewRot, 0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    viewRot = glm::rotate(viewRot, yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+    viewRot = glm::rotate(viewRot, pitch, glm::vec3(1.0f, 0.0f, 0.0f));
     cameraForward = viewRot * glm::vec4(cameraForward, 1);
     cameraRight = viewRot * glm::vec4(cameraRight, 1);
     glm::mat4 viewTrans = glm::mat4(1.0f);
@@ -320,7 +346,7 @@ void drawGLScene() {
 
 }
 
-void resizeGL(int width, int height) {
+void resizeGL(GLFWwindow *window, int width, int height) {
 
     // Prevent division by zero
     if (height == 0)
@@ -332,6 +358,7 @@ void resizeGL(int width, int height) {
 
     // Set the OpenGL viewport
     glViewport(0, 0, width, height);
+
 
 }
 
@@ -350,22 +377,30 @@ static void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int actio
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 
-    if (key == GLFW_KEY_W) {
-        cameraPosition = cameraPosition + cameraForward * (float)(timeDelta * 10.0f); 
-        printf("W\n");
-    }
-    else if(key == GLFW_KEY_A) {
-        cameraPosition = cameraPosition - cameraRight * (float)(timeDelta * 10.0f); 
-        printf("A\n");
-    }
-    else if(key == GLFW_KEY_S) {
-        cameraPosition = cameraPosition - cameraForward * (float)(timeDelta * 10.0f); 
-        printf("S\n");
-    }
-    else if(key == GLFW_KEY_D) {
-        cameraPosition = cameraPosition + cameraRight * (float)(timeDelta * 10.0f); 
-        printf("D\n");
-    }
+    int value;
+    if (action == GLFW_PRESS)
+        value = 1;
+    else if (action == GLFW_RELEASE)
+        value = 0;
+    else
+        return;
+
+    if (key == GLFW_KEY_W) 
+        keys[CONTROL_FORWARD] = value;
+    else if(key == GLFW_KEY_A)
+        keys[CONTROL_LEFT] = value;
+    else if(key == GLFW_KEY_S) 
+        keys[CONTROL_BACK] = value;
+    else if(key == GLFW_KEY_D) 
+        keys[CONTROL_RIGHT] = value;
+}
+
+void glfwMouseCallback(GLFWwindow *window, double x, double y) {
+    
+    pitch = (x-centerX) * CAMERA_SENSITITVITY;
+    yaw = (y-centerY) * CAMERA_SENSITITVITY;
+
+    glfwSetCursorPos(window, centerX, centerY);
 }
 
 /*
@@ -373,7 +408,10 @@ static void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int actio
  */
 void glfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
 
-    resizeGL(width, height);
+    resizeGL(window, width, height);
+
+    centerX = width/2;
+    centerY = height/2;
 
 }
 
@@ -395,6 +433,7 @@ int main(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 
+
     // Create window
     GLFWwindow* window = glfwCreateWindow(DEFAULT_WIDTH, DEFAULT_HEIGHT, "Minimal", NULL, NULL);
     if (!window) {
@@ -403,8 +442,11 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    // Set input key event callback
+    // Set input callback functions
     glfwSetKeyCallback(window, glfwKeyCallback);
+    glfwSetCursorPosCallback(window, glfwMouseCallback);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
     // Set window resize callback
     glfwSetWindowSizeCallback(window, glfwWindowSizeCallback);
@@ -423,6 +465,7 @@ int main(void) {
     // Make GLFW swap buffers directly 
     glfwSwapInterval(0);
 
+
     // Initialize OpenGL
     if (!initGL()) {
         printf("Failed to initialize OpenGL\n");  
@@ -432,8 +475,9 @@ int main(void) {
     }
 
     // Initialize OpenGL view
-    resizeGL(DEFAULT_WIDTH, DEFAULT_HEIGHT);
+    resizeGL(window, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
+    pitch = yaw = 0.0f;
     cameraPosition = glm::vec3(0.0f, 0.0f, 3.0f);
     cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
     cameraRight = glm::vec3(1.0f, 0.0f, 0.0f);
@@ -446,7 +490,7 @@ int main(void) {
         double timeTotal = glfwGetTime();
         timeDelta = timeTotal - previousTime;
         previousTime = timeTotal;
-         
+       
         // Draw OpenGL screne
         drawGLScene();
 
