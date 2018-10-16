@@ -128,7 +128,7 @@ int initGL() {
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
     // Create and initialize buffer names
-    glCreateBuffers(7, vertexBufferNames);
+    glCreateBuffers(5, vertexBufferNames);
 
     // Allocate storage for the transformation matrices and retrieve their addresses
     glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -240,85 +240,96 @@ int initGL() {
 
 }
 
-int createSphere(float radius, int numDiv) {
+/*
+ * Create a sphere with the specified radius and with the specified number of segments.
+ * numV specifies the number of segments along the vertical axis
+ * numH specifies the number of segments along the horizontal axis
+ */
+int createSphere(float radius, int numH, int numV) {
 
-    printf("Creating Sphere %f %d\n", radius, numDiv);
+    if (numH < 4 || numV < 2)
+        return 0;
 
     // Variables needed for the calculations
-    float t1, t2;
     float pi = glm::pi<float>();
     float pi2 = pi * 2.0f;
-    float d = pi2 / numDiv;
+    float d1 = pi / numV;
+    float d2 = pi2 / numH;
 
     // Allocate the data needed to store the necessary positions, normals and texture coordinates
-    int numVertices = (numDiv*(numDiv-1)+2);
-    int numFloats = (3+3+2);
-    int numTotal = numVertices * numFloats;
-    printf("TotalFloats %d\n", numTotal);
-    GLfloat vertexData[numTotal];
+    int numVertices = numH*(numV-1)+2;
+    int numPer = (3+3+2);
+    GLfloat vertexData[numVertices * numPer];
 
-    // Position
+    // Create the top vertex
     vertexData[0] = 0.0f; vertexData[1] = radius; vertexData[2] = 0.0f;
-    // Normal
     vertexData[3] = 0.0f; vertexData[4] = 1.0f; vertexData[5] = 0.0f;
-    // UV
     vertexData[6] = 0.5f; vertexData[7] = 1.0f;
-    for (int j=0; j<numDiv-1; j++) {
-        for (int i=0; i<numDiv; i++) {
-            // Position
-            vertexData[(j*numDiv+i+1)*numFloats] = radius * glm::sin(i*d) * glm::sin((j+1)*d);
-            vertexData[(j*numDiv+i+1)*numFloats+1] = radius * glm::cos((j+1) * d);
-            vertexData[(j*numDiv+i+1)*numFloats+2] = radius * glm::cos(i*d) * glm::sin((j+1)*d);
-            // Normal
-            vertexData[(j*numDiv+i+1)*numFloats+3] = glm::sin(i*d) * glm::sin((j+1)*d);
-            vertexData[(j*numDiv+i+1)*numFloats+4] = glm::cos((j+1)*d);
-            vertexData[(j*numDiv+i+1)*numFloats+5] = glm::cos(i*d)*glm::cos((j+1)*d);
-            // UV
-            vertexData[(j*numDiv+i+1)*numFloats+6] = glm::asin(vertexData[(j*numDiv+i+1)*numFloats+3]) / pi + 0.5f;
-            vertexData[(j*numDiv+i+1)*numFloats+7] = glm::asin(vertexData[(j*numDiv+i+1)*numFloats+4]) / pi + 0.5f;
+
+    // Loop through the divisions along the vertical axis
+    for (int i=0; i<numV-1; ++i) {
+        // Loop through the divisions along the horizontal axis
+        for (int j=0; j<numH; ++j) {
+            // Calculate the variables needed for this iteration
+            int base = (i * numH + j + 1) * numPer;
+            float t1 = d1 * (i + 1);
+            float t2 = d2 * j;
+            // Position (like given in lecture)
+            vertexData[base] = radius * glm::sin(t2) * glm::sin(t1);
+            vertexData[base+1] = radius * glm::cos(t1);
+            vertexData[base+2] = radius * glm::cos(t2) * glm::sin(t1);
+            // Normal (the same as position except unit length)
+            vertexData[base+3] = glm::sin(t2) * glm::sin(t1);
+            vertexData[base+4] = glm::cos(t1);
+            vertexData[base+5] = glm::cos(t2)*glm::sin(t1);
+            // UV 
+            vertexData[base+6] = glm::asin(vertexData[base+3]) / pi + 0.5f;
+            vertexData[base+7] = glm::asin(vertexData[base+4]) / pi + 0.5f;
         }
     }
-    // Position
-    vertexData[(numVertices-1)*numFloats] = 0.0f; vertexData[(numVertices-1)*numFloats+1] = -radius; vertexData[(numVertices-1)*numFloats+2] = 0.0f;
-    // Normal
-    vertexData[(numVertices-1)*numFloats+3] = 0.0f; vertexData[(numVertices-1)*numFloats+4] = -1.0f; vertexData[(numVertices-1)*numFloats+5] = 0.0f;
-    // UV
-    vertexData[(numVertices-1)*numFloats+6] = 0.5f; vertexData[(numVertices-1)*numFloats+7] = 0.0f;
+
+    // Create the bottom vertex
+    vertexData[(numVertices-1)*numPer] = 0.0f; vertexData[(numVertices-1)*numPer+1] = -radius; vertexData[(numVertices-1)*numPer+2] = 0.0f;
+    vertexData[(numVertices-1)*numPer+3] = 0.0f; vertexData[(numVertices-1)*numPer+4] = -1.0f; vertexData[(numVertices-1)*numPer+5] = 0.0f;
+    vertexData[(numVertices-1)*numPer+6] = 0.5f; vertexData[(numVertices-1)*numPer+7] = 0.0f;
 
     // Allocate the data needed to store the indices
-    int numTriangles = (numDiv*(numDiv-1)*2);
+    int numTriangles = (numH*(numV-1)*2);
     numIndices = numTriangles * 3;
-    printf("NumIndices %d\n", numIndices);
-
     GLushort indexData[numIndices];
 
-    for (int i=0; i<numDiv; i++) {
-        indexData[i*3] = 0; indexData[i*3+1] = (GLushort)(i+1); indexData[i*3+2] = (GLushort)((i+1)%numDiv+1);
+    // Create the triangles for the top
+    for (int j=0; j<numH; j++) {
+        indexData[j*3] = 0; 
+        indexData[j*3+1] = (GLushort)(j+1); 
+        indexData[j*3+2] = (GLushort)((j+1)%numH+1);
     }
-    for (int j=0; j<numDiv-2; j++) {
-        for (int i=0; i<numDiv; i++) {
-            indexData[((j*numDiv+i)*2+numDiv)*3] = (GLushort)(j*numDiv+i+1);
-            indexData[((j*numDiv+i)*2+numDiv)*3+1] = (GLushort)((j+1)*numDiv+i+1);
-            indexData[((j*numDiv+i)*2+numDiv)*3+2] = (GLushort)((j+1)*numDiv+(i+1)%numDiv+1);
+    // Loop through the segment circles 
+    for (int i=0; i<numV-2; ++i) {
+        for (int j=0; j<numH; ++j) {
+            indexData[((i*numH+j)*2+numH)*3] = (GLushort)(i*numH+j+1);
+            indexData[((i*numH+j)*2+numH)*3+1] = (GLushort)((i+1)*numH+j+1);
+            indexData[((i*numH+j)*2+numH)*3+2] = (GLushort)((i+1)*numH+(j+1)%numH+1);
 
-            indexData[((j*numDiv+i)*2+numDiv)*3+3] = (GLushort)((j+1)*numDiv+(i+1)%numDiv+1);
-            indexData[((j*numDiv+i)*2+numDiv)*3+4] = (GLushort)(j*numDiv+(i+1)%numDiv+1);
-            indexData[((j*numDiv+i)*2+numDiv)*3+5] = (GLushort)(j*numDiv+i+1);
+            indexData[((i*numH+j)*2+numH)*3+3] = (GLushort)((i+1)*numH+(j+1)%numH+1);
+            indexData[((i*numH+j)*2+numH)*3+4] = (GLushort)(i*numH+(j+1)%numH+1);
+            indexData[((i*numH+j)*2+numH)*3+5] = (GLushort)(i*numH+j+1);
         }
     }
-    int trianglIndex = (numTriangles-numDiv);
-    int vertIndex = (numDiv-2)*numDiv+1;
-    for (short i=0; i<numDiv; i++) {
-        indexData[(trianglIndex+i)*3] = (GLushort)(vertIndex+i);
-        indexData[(trianglIndex+i)*3+1] = (GLushort)((numDiv*(numDiv-1)+1));
-        indexData[(trianglIndex+i)*3+2] = (GLushort)(vertIndex+(i+1)%numDiv);
+    // Create the triangles for the bottom
+    int triIndex = (numTriangles-numH);
+    int vertIndex = (numV-2)*numH+1;
+    for (short i=0; i<numH; i++) {
+        indexData[(triIndex+i)*3] = (GLushort)(vertIndex+i);
+        indexData[(triIndex+i)*3+1] = (GLushort)((numH*(numV-1)+1));
+        indexData[(triIndex+i)*3+2] = (GLushort)(vertIndex+(i+1)%numH);
     }
 
 
-    // Create a vertex buffer with the vertex data
+    // Create a vertex buffer for the vertex and index data
     glCreateBuffers(2, &vertexBufferNames[VERTICES]);
-    glNamedBufferStorage(vertexBufferNames[VERTICES], numTotal * sizeof(GLfloat), vertexData, GL_STATIC_DRAW);
-    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLushort), indexData, GL_STATIC_DRAW);
+    glNamedBufferStorage(vertexBufferNames[VERTICES], numVertices * numPer * sizeof(GLfloat), vertexData, 0);
+    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLushort), indexData, 0);
 
     // Create and initialize a vertex array object
     glCreateVertexArrays(1, &vertexArrayName);
@@ -327,6 +338,7 @@ int createSphere(float radius, int numDiv) {
     glVertexArrayAttribBinding(vertexArrayName, POSITION, STREAM0);
     glVertexArrayAttribBinding(vertexArrayName, NORMAL, STREAM0);
     glVertexArrayAttribBinding(vertexArrayName, UV, STREAM0);
+
     // Enable the attributes
     glEnableVertexArrayAttrib(vertexArrayName, POSITION);
     glEnableVertexArrayAttrib(vertexArrayName, NORMAL);
@@ -437,7 +449,7 @@ void glfwWindowSizeCallback(GLFWwindow* window, int width, int height) {
 int main(int nargs, const char **argv) {
 
     // Ensure that there is one argument (besides the program name)
-    if (nargs != 3) {
+    if (nargs != 4) {
         printf("Wrong usage\n");
         exit(EXIT_FAILURE);
     }
@@ -491,9 +503,9 @@ int main(int nargs, const char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    // Load the OBJ-file
-    if (!createSphere(atof(argv[1]), atoi(argv[2]))) {
-        printf("Failed to load %s.\n", argv[1]);  
+    // Create the sphere based on the command line arguments 
+    if (!createSphere(atof(argv[1]), atoi(argv[2]), atoi(argv[3]))) {
+        printf("Failed to create sphere.\n");  
         glfwDestroyWindow(window);
         glfwTerminate();
         exit(EXIT_FAILURE);

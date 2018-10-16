@@ -72,6 +72,5 @@ void main()
 
     // Put it all together
     outputColor = ambient + diffuse + specular;
-    outputColor = vec4(1.0);
 
 }
