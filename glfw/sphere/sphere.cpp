@@ -21,7 +21,7 @@
 #define MATERIAL_PROPERTIES 3
 #define CAMERA_PROPERTIES 4
 #define VERTICES 5
-#define INDICES 5
+#define INDICES 6
 
 // Vertex Array attributes
 #define POSITION 0
@@ -41,7 +41,7 @@
 // Light properties (4 valued vectors due to std140 see OpenGL 4.5 reference)
 GLfloat lightProperties[] {
     // Position
-    0.0f, 0.0f, 70.0f, 0.0f,
+    0.0f, 0.0f, 10.0f, 0.0f,
     // Ambient Color
     0.4f, 0.4f, 0.4f, 0.0f,
     // Diffuse Color
@@ -60,7 +60,7 @@ GLfloat materialProperties[] = {
 // Camera properties 
 GLfloat cameraProperties[] {
     // Position 
-    0.0f, 0.0f, 80.0f
+    0.0f, 0.0f, 10.0f
 };
 
 // Pointers for updating GPU data
@@ -242,16 +242,19 @@ int initGL() {
 
 int createSphere(float radius, int numDiv) {
 
+    printf("Creating Sphere %f %d\n", radius, numDiv);
+
     // Variables needed for the calculations
     float t1, t2;
-    float pi = glm::pi;
-    float pi2 = pi*2f;
-    float d = pi2/numDiv;
+    float pi = glm::pi<float>();
+    float pi2 = pi * 2.0f;
+    float d = pi2 / numDiv;
 
     // Allocate the data needed to store the necessary positions, normals and texture coordinates
-    int numVertices = (numH*(numV-1)+2);
+    int numVertices = (numDiv*(numDiv-1)+2);
     int numFloats = (3+3+2);
-    int numTotal = numVerices * numFloats;
+    int numTotal = numVertices * numFloats;
+    printf("TotalFloats %d\n", numTotal);
     GLfloat vertexData[numTotal];
 
     // Position
@@ -263,16 +266,16 @@ int createSphere(float radius, int numDiv) {
     for (int j=0; j<numDiv-1; j++) {
         for (int i=0; i<numDiv; i++) {
             // Position
-            vertexData[(j*numH+i+1)*numFloats] = radius * glm::sin(i*d) * glm::sin((j+1)*d);
-            vertexData[(j*numH+i+1)*numFloats+1] = radius * glm::cos((j+1) * d);
-            vertexData[(j*numH+i+1)*numFloats+2] = radius * glm::cos(i*d) * glm::sin((j+1)*d);
+            vertexData[(j*numDiv+i+1)*numFloats] = radius * glm::sin(i*d) * glm::sin((j+1)*d);
+            vertexData[(j*numDiv+i+1)*numFloats+1] = radius * glm::cos((j+1) * d);
+            vertexData[(j*numDiv+i+1)*numFloats+2] = radius * glm::cos(i*d) * glm::sin((j+1)*d);
             // Normal
-            vertexData[(j*numH+i+1)*numFloats+3] = glm::sin(i*d) * glm::sin((j+1)*d);
-            vertexData[(j*numH+i+1)*numFloats+4] = glm::cos((j+1)*d);
-            vertexData[(j*numH+i+1)*numFloats+5] = glm::cos(i*d)*Math.sin((j+1)*d);
+            vertexData[(j*numDiv+i+1)*numFloats+3] = glm::sin(i*d) * glm::sin((j+1)*d);
+            vertexData[(j*numDiv+i+1)*numFloats+4] = glm::cos((j+1)*d);
+            vertexData[(j*numDiv+i+1)*numFloats+5] = glm::cos(i*d)*glm::cos((j+1)*d);
             // UV
-            vertexData[(j*numH+i+1)*numFloats+6] = glm::asin(vertexData[(j*numH+i+1)*numFloats+3]) / pi + 0.5f;
-            vertexData[(j*numH+i+1)*numFloats+7] = glm::asin(vertexData[(j*numH+i+1)*numFloats+4]) / pi + 0.5f;
+            vertexData[(j*numDiv+i+1)*numFloats+6] = glm::asin(vertexData[(j*numDiv+i+1)*numFloats+3]) / pi + 0.5f;
+            vertexData[(j*numDiv+i+1)*numFloats+7] = glm::asin(vertexData[(j*numDiv+i+1)*numFloats+4]) / pi + 0.5f;
         }
     }
     // Position
@@ -285,35 +288,37 @@ int createSphere(float radius, int numDiv) {
     // Allocate the data needed to store the indices
     int numTriangles = (numDiv*(numDiv-1)*2);
     numIndices = numTriangles * 3;
+    printf("NumIndices %d\n", numIndices);
+
     GLushort indexData[numIndices];
 
-    for (int i=0; i<numH; i++) {
-        indexData[i*3] = 0; indexData[i*3+1] = (GLushort)(i+1); indexData[i*3+2] = (GLushort)((i+1)%numH+1);
+    for (int i=0; i<numDiv; i++) {
+        indexData[i*3] = 0; indexData[i*3+1] = (GLushort)(i+1); indexData[i*3+2] = (GLushort)((i+1)%numDiv+1);
     }
-    for (int j=0; j<numV-2; j++) {
-        for (int i=0; i<numH; i++) {
-            indexData[((j*numH+i)*2+numH)*3] = (GLushort)(j*numH+i+1);
-            indexData[((j*numH+i)*2+numH)*3+1] = (GLushort)((j+1)*numH+i+1);
-            indexData[((j*numH+i)*2+numH)*3+2] = (GLushort)((j+1)*numH+(i+1)%numH+1);
+    for (int j=0; j<numDiv-2; j++) {
+        for (int i=0; i<numDiv; i++) {
+            indexData[((j*numDiv+i)*2+numDiv)*3] = (GLushort)(j*numDiv+i+1);
+            indexData[((j*numDiv+i)*2+numDiv)*3+1] = (GLushort)((j+1)*numDiv+i+1);
+            indexData[((j*numDiv+i)*2+numDiv)*3+2] = (GLushort)((j+1)*numDiv+(i+1)%numDiv+1);
 
-            indexData[((j*numH+i)*2+numH)*3+3] = (GLushort)((j+1)*numH+(i+1)%numH+1);
-            indexData[((j*numH+i)*2+numH)*3+4] = (GLushort)(j*numH+(i+1)%numH+1);
-            indexData[((j*numH+i)*2+numH)*3+5] = (GLushort)(j*numH+i+1);
+            indexData[((j*numDiv+i)*2+numDiv)*3+3] = (GLushort)((j+1)*numDiv+(i+1)%numDiv+1);
+            indexData[((j*numDiv+i)*2+numDiv)*3+4] = (GLushort)(j*numDiv+(i+1)%numDiv+1);
+            indexData[((j*numDiv+i)*2+numDiv)*3+5] = (GLushort)(j*numDiv+i+1);
         }
     }
-    int trianglIndex = (numTriangles-numH);
-    int vertIndex = (numV-2)*numH+1;
-    for (short i=0; i<numH; i++) {
+    int trianglIndex = (numTriangles-numDiv);
+    int vertIndex = (numDiv-2)*numDiv+1;
+    for (short i=0; i<numDiv; i++) {
         indexData[(trianglIndex+i)*3] = (GLushort)(vertIndex+i);
-        indexData[(trianglIndex+i)*3+1] = (GLushort)((numH*(numV-1)+1));
-        indexData[(trianglIndex+i)*3+2] = (GLushort)(vertIndex+(i+1)%numH);
+        indexData[(trianglIndex+i)*3+1] = (GLushort)((numDiv*(numDiv-1)+1));
+        indexData[(trianglIndex+i)*3+2] = (GLushort)(vertIndex+(i+1)%numDiv);
     }
 
 
     // Create a vertex buffer with the vertex data
-    glCreateBuffers(2, &vertexBufferNames[5]);
-    glNamedBufferStorage(vertexBufferNames[VERTICES], numTotal * sizeof(GLfloat), &vertexData[0], 0);
-    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLfloat), &indexData[0], 0);
+    glCreateBuffers(2, &vertexBufferNames[VERTICES]);
+    glNamedBufferStorage(vertexBufferNames[VERTICES], numTotal * sizeof(GLfloat), vertexData, GL_STATIC_DRAW);
+    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLushort), indexData, GL_STATIC_DRAW);
 
     // Create and initialize a vertex array object
     glCreateVertexArrays(1, &vertexArrayName);
@@ -353,12 +358,11 @@ void drawGLScene() {
 
     // Set the view matrix
     glm::mat4 view = glm::mat4(1.0f);
-    view = glm::translate(view, glm::vec3(-cameraProperties[0], -cameraProperties[1], -cameraProperties[2]));
+    view = glm::translate(view, -glm::vec3(cameraProperties[0], cameraProperties[1], cameraProperties[2]));
     memcpy(viewMatrixPtr, &view[0][0], 16 * sizeof(GLfloat));
 
     // Set the model matrix
     glm::mat4 model = glm::mat4(1.0);
-    model = glm::translate(model, glm::vec3(0.0f, -20.0f, 0.0f));
     model = glm::rotate(model, (float)glfwGetTime() * 0.3f, glm::vec3(0.0f, 1.0f,  0.0f));
     memcpy(modelMatrixPtr, &model[0][0], 16 * sizeof(GLfloat));
 
