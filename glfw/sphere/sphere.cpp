@@ -259,7 +259,8 @@ int createSphere(float radius, int numH, int numV) {
     // Allocate the data needed to store the necessary positions, normals and texture coordinates
     int numVertices = numH*(numV-1)+2;
     int numPer = (3+3+2);
-    GLfloat vertexData[numVertices * numPer];
+
+    std::vector<GLfloat> vertexData(numVertices * numPer);
 
     // Create the top vertex
     vertexData[0] = 0.0f; vertexData[1] = radius; vertexData[2] = 0.0f;
@@ -296,7 +297,7 @@ int createSphere(float radius, int numH, int numV) {
     // Allocate the data needed to store the indices
     int numTriangles = (numH*(numV-1)*2);
     numIndices = numTriangles * 3;
-    GLushort indexData[numIndices];
+    std::vector<GLushort> indexData(numIndices);
 
     // Create the triangles for the top
     for (int j=0; j<numH; j++) {
@@ -328,8 +329,8 @@ int createSphere(float radius, int numH, int numV) {
 
     // Create a vertex buffer for the vertex and index data
     glCreateBuffers(2, &vertexBufferNames[VERTICES]);
-    glNamedBufferStorage(vertexBufferNames[VERTICES], numVertices * numPer * sizeof(GLfloat), vertexData, 0);
-    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLushort), indexData, 0);
+    glNamedBufferStorage(vertexBufferNames[VERTICES], numVertices * numPer * sizeof(GLfloat), &vertexData[0], 0);
+    glNamedBufferStorage(vertexBufferNames[INDICES], numIndices * sizeof(GLushort), &indexData[0], 0);
 
     // Create and initialize a vertex array object
     glCreateVertexArrays(1, &vertexArrayName);

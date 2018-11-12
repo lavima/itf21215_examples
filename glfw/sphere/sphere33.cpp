@@ -218,7 +218,7 @@ int createSphere(float radius, int numH, int numV) {
     // Allocate the data needed to store the necessary positions, normals and texture coordinates
     int numVertices = numH*(numV-1)+2;
     int numPer = (3+3+2);
-    GLfloat vertexData[numVertices * numPer];
+    std::vector<GLfloat> vertexData(numVertices * numPer);
 
     // Create the top vertex
     vertexData[0] = 0.0f; vertexData[1] = radius; vertexData[2] = 0.0f;
@@ -289,7 +289,7 @@ int createSphere(float radius, int numH, int numV) {
     glGenBuffers(1, &vertexBufferName);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferName); // 2.0
-    glBufferData(GL_ARRAY_BUFFER, numVertices * numPer * sizeof(GLfloat), vertexData, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, numVertices * numPer * sizeof(GLfloat), &vertexData[0], GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // 2.0
 
     // Create and initialize a vertex array object
