@@ -119,7 +119,7 @@ int initGL() {
 
     GLuint vertexName = glCreateShader(GL_VERTEX_SHADER);
     int vertexLength = 0;
-    char *vertexSource = readSourceFile("tesselation.vert", &vertexLength);
+    char *vertexSource = readSourceFile("tessellation.vert", &vertexLength);
     glShaderSource(vertexName, 1, (const char * const *)&vertexSource, &vertexLength);
     GLint compileStatus;
     glCompileShader(vertexName);
@@ -137,7 +137,7 @@ int initGL() {
 
     GLuint tessEvalName = glCreateShader(GL_TESS_EVALUATION_SHADER);
     int tessLength = 0;
-    char *tessSource = readSourceFile("tesselation.tes", &tessLength);
+    char *tessSource = readSourceFile("tessellation.tes", &tessLength);
     glShaderSource(tessEvalName, 1, (const char * const *)&tessSource, &tessLength);
     glCompileShader(tessEvalName);
     glGetShaderiv(tessEvalName, GL_COMPILE_STATUS, &compileStatus);
@@ -154,7 +154,7 @@ int initGL() {
 
     GLuint fragmentName = glCreateShader(GL_FRAGMENT_SHADER);
     int fragmentLength = 0;
-    char *fragmentSource = readSourceFile("tesselation.frag", &fragmentLength);
+    char *fragmentSource = readSourceFile("tessellation.frag", &fragmentLength);
     glShaderSource(fragmentName, 1, (const char * const *)&fragmentSource, &fragmentLength);
     glCompileShader(fragmentName);
     glGetShaderiv(fragmentName, GL_COMPILE_STATUS, &compileStatus);
