@@ -28,7 +28,8 @@ GLfloat vertices[] = {
     -1.0f, -1.0f, 0.0f,
     1.0f, -1.0f, 0.0f,
     1.0f, 1.0f, 0.0f,
-    -1.0f, 1.0f, 0.0f };
+    -1.0f, 1.0f, 0.0f 
+};
 
 GLfloat patchOuter[] { 4.0f, 4.0f, 4.0f, 4.0f };
 GLfloat patchInner[] { 4.0f, 4.0f };
@@ -94,7 +95,7 @@ int initGL() {
 
     glCreateBuffers(3, vertexBufferNames);
 
-    glNamedBufferStorage(vertexBufferNames[VERTICES], 12 * sizeof(GLfloat), vertices, GL_DYNAMIC_DRAW);
+    glNamedBufferStorage(vertexBufferNames[VERTICES], 12 * sizeof(GLfloat), vertices, 0);
 
     // Allocate storage for the transformation matrices and retrieve their addresses
     glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -192,6 +193,8 @@ int initGL() {
     glPatchParameterfv(GL_PATCH_DEFAULT_OUTER_LEVEL, patchOuter);
     glPatchParameterfv(GL_PATCH_DEFAULT_INNER_LEVEL, patchInner);
 
+    glEnable(GL_DEPTH_TEST);
+
     return 1;
 
 }
@@ -202,21 +205,18 @@ int initGL() {
 void drawGLScene() {
 
     // Clear color and depth buffers
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Change the view matrix
-    GLfloat view[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1 };
-    memcpy(viewMatrixPtr, view, 16 * sizeof(GLfloat));
+    glm::mat4 view = glm::mat4(1.0f);
+    view = glm::translate(view, glm::vec3(0, 0, -3));
+    memcpy(viewMatrixPtr, &view[0][0], 16*sizeof(GLfloat));
 
     // Change the model matrix
     GLfloat scale[16] = {
-        1.0f, 0, 0, 0,
-        0, 1.0f, 0, 0,
-        0, 0, 1.0f, 0,
+        0.1f, 0, 0, 0,
+        0, 0.1f, 0, 0,
+        0, 0, 0.1f, 0,
         0, 0, 0, 1.0f };
     memcpy(modelMatrixPtr, scale, 16 * sizeof(GLfloat));
 
@@ -231,9 +231,7 @@ void drawGLScene() {
     glBindBufferBase(GL_UNIFORM_BUFFER, TRANSFORM1, vertexBufferNames[MODEL_MATRIX]);
 
     // Draw the vertex array
-    printf("Test1\n");
-    glDrawArrays(GL_PATCHES, 0, 4);
-    printf("Test2\n");
+    glDrawArrays(GL_PATCHES, 0, 4);    
 
     // Disable
     glUseProgram(0);
@@ -248,13 +246,9 @@ void resizeGL(int width, int height) {
         height = 1;										
   
     // Change the projection matrix
-    GLfloat projection[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1 };
-    glm::mat4 proj= glm::ortho(-1, 1, -1, 1, -1, 1);
-    memcpy(projectionMatrixPtr, &proj[0][0], 16 * sizeof(GLfloat));
+    glm::mat4 proj = glm::perspective(3.14f/2.0f, (float)width/height, 0.1f, 100.0f);
+    //glm::mat4 proj = glm::ortho(-1, 1, -1, 1, -1, 1);
+    memcpy(projectionMatrixPtr, &proj[0][0], 16*sizeof(GLfloat));
 
     // Set the OpenGL viewport
     glViewport(0, 0, width, height);
@@ -350,8 +344,7 @@ int main(void) {
 
         // Swap buffers
         glfwSwapBuffers(window);
-        printf("Test3\n");
-
+        
         // Poll fow input events
         glfwPollEvents();
 
