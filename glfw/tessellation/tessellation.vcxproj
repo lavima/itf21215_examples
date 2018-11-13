@@ -19,11 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sphere.cpp" />
+    <ClCompile Include="tessellation.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{C951E747-E92F-4E7C-A3F6-70F2A52F1585}</ProjectGuid>
+    <ProjectGuid>{C951E747-E92F-4E7C-A3F6-70F2A52F5585}</ProjectGuid>
     <RootNamespace>sphere</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>

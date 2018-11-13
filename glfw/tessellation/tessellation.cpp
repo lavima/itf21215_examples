@@ -94,7 +94,7 @@ int initGL() {
 
     glCreateBuffers(3, vertexBufferNames);
 
-    glNamedBufferStorage(vertexBufferNames[VERTICES], 12 * sizeof(GLfloat), vertices, GL_STREAM_DRAW);
+    glNamedBufferStorage(vertexBufferNames[VERTICES], 12 * sizeof(GLfloat), vertices, GL_DYNAMIC_DRAW);
 
     // Allocate storage for the transformation matrices and retrieve their addresses
     glNamedBufferStorage(vertexBufferNames[GLOBAL_MATRICES], 16 * sizeof(GLfloat) * 2, NULL, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -350,6 +350,7 @@ int main(void) {
 
         // Swap buffers
         glfwSwapBuffers(window);
+        printf("Test3\n");
 
         // Poll fow input events
         glfwPollEvents();
